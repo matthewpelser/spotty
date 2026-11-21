@@ -29,5 +29,5 @@
 
 ## Housekeeping
 
-- Nothing has been committed beyond the initial README (as of 2026-11-21).
+- First proof of concept committed as `ad92f8e` on branch `poc` (pushed to origin, 2026-11-21); `main` still has only the initial README.
 - Diagnostic logging kept on purpose: `[net]` heartbeat, `[netwatch]`, `[art]`, `[screen]`, `[soap]`, WiFi events.
