@@ -93,24 +93,74 @@ void handleRooms(AsyncWebServerRequest *req) {
   sendJson(req, doc);
 }
 
+// Append s as a JSON string literal.
+void jsonStr(String &out, const String &s) {
+  out += '"';
+  for (size_t i = 0; i < s.length(); i++) {
+    char c = s[i];
+    if (c == '"' || c == '\\') {
+      out += '\\';
+      out += c;
+    } else if ((uint8_t)c < 0x20) {
+      char buf[8];
+      snprintf(buf, sizeof(buf), "\\u%04x", c);
+      out += buf;
+    } else {
+      out += c;
+    }
+  }
+  out += '"';
+}
+
 void handleFavourites(AsyncWebServerRequest *req) {
-  JsonDocument doc(PsramAllocator::instance());
-  JsonArray arr = doc.to<JsonArray>();
+  // Hundreds of items: write the JSON text straight into one big buffer
+  // (>4 KB, so it lands in PSRAM) instead of building a JsonDocument.
+  String out;
+  out.reserve(96 * 1024);
+  out += '[';
+  bool first = true;
   catalog::forEach([&](const Favourite &f) {
-    JsonObject o = arr.add<JsonObject>();
-    o["title"] = f.title;
-    o["uri"] = f.uri;
-    o["group"] = f.group;
+    if (!first) out += ',';
+    first = false;
+    out += "{\"title\":";
+    jsonStr(out, f.title);
+    out += ",\"uri\":";
+    jsonStr(out, f.uri);
+    out += ",\"group\":";
+    jsonStr(out, f.group);
+    if (f.art.length()) {
+      out += ",\"art\":";
+      jsonStr(out, f.art);
+    }
     String why = unsupportedReason(f);
-    if (why.length()) o["unsupported"] = why;
+    if (why.length()) {
+      out += ",\"unsupported\":";
+      jsonStr(out, why);
+    }
+    out += '}';
   });
-  sendJson(req, doc);
+  out += ']';
+  req->send(200, "application/json", out);
 }
 
 void handlePresets(AsyncWebServerRequest *req) {
   JsonDocument doc;
-  presets::toJson(doc.to<JsonArray>());
+  JsonArray arr = doc.to<JsonArray>();
+  presets::toJson(arr);
+  for (JsonObject p : arr) {  // cover for the preset tile
+    Favourite f;
+    String uri = p["favUri"] | "";
+    if (uri.length() && catalog::find(uri, f) && f.art.length()) p["art"] = f.art;
+  }
   sendJson(req, doc);
+}
+
+String nowJson() {
+  JsonDocument doc;
+  actions::nowPlayingJson(doc.to<JsonObject>());
+  String out;
+  serializeJson(doc, out);
+  return out;
 }
 
 void handleServices(AsyncWebServerRequest *req) {
@@ -172,6 +222,7 @@ void handleAction(AsyncWebServerRequest *req) {
     req->send(400, "text/plain", "bad preset");
     return;
   }
+  if (t == ActionType::Volume) n = constrain(n, 0, 100);
   bool ok = actions::post(t, n);
   req->send(ok ? 200 : 503, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
@@ -186,6 +237,9 @@ void begin() {
   server.on("/api/rooms", HTTP_GET, handleRooms);
   server.on("/api/favourites", HTTP_GET, handleFavourites);
   server.on("/api/presets", HTTP_GET, handlePresets);
+  server.on("/api/nowplaying", HTTP_GET, [](AsyncWebServerRequest *req) {
+    req->send(200, "application/json", nowJson());
+  });
   server.on("/api/action", HTTP_POST, handleAction);
   server.on("/api/screen", HTTP_GET, handleScreen);
   registerServiceRoutes();
@@ -205,9 +259,11 @@ void begin() {
 
   events.onConnect([](AsyncEventSourceClient *client) {
     client->send(frameJson().c_str(), "frame", millis());
+    client->send(nowJson().c_str(), "np", millis());
   });
   server.addHandler(&events);
   display::onChange([] { events.send(frameJson().c_str(), "frame", millis()); });
+  actions::onNowPlayingChange([] { events.send(nowJson().c_str(), "np", millis()); });
 
   server.onNotFound([](AsyncWebServerRequest *req) { req->send(404, "text/plain", "not found"); });
   server.begin();

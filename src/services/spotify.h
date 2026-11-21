@@ -21,6 +21,7 @@ struct Item {
   String id;    // Spotify ID
   String title;
   const char *group;  // dropdown section (static string), e.g. "Spotify - Your playlists"
+  String image;       // cover URL (https, Spotify CDN), "" if none
 };
 
 void begin();

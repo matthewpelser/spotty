@@ -1,5 +1,8 @@
 #pragma once
 #include <Arduino.h>
+#include <ArduinoJson.h>
+
+#include <functional>
 
 #include <vector>
 
@@ -8,7 +11,8 @@
 // calls never block button reads or the web server.
 enum class ActionType : uint8_t {
   Preset, PlayPause, Stop, VolUp, VolDown, Next, Random, Rescan,
-  Sync,  // finish a music-service sign-in and reload its lists
+  Sync,    // finish a music-service sign-in and reload its lists
+  Volume,  // absolute group volume; index = 0..100
 };
 
 enum class Phase : uint8_t { Starting, Discovering, NoSonos, Ready };
@@ -26,5 +30,11 @@ Phase phase();
 std::vector<String> currentGroup();
 // millis() of the last action handled (for the LED flicker).
 uint32_t lastActivity();
+
+// What's playing on the current group, for the web UI (title, artist, album,
+// art, state, volume, group, preset). Updated by the worker on every poll.
+void nowPlayingJson(JsonObject out);
+// Called (from the worker task) whenever nowPlayingJson would change.
+void onNowPlayingChange(std::function<void()> cb);
 
 }  // namespace actions

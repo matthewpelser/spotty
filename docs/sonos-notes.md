@@ -21,6 +21,9 @@ Discovery: SSDP `M-SEARCH` for `urn:schemas-upnp-org:device:ZonePlayer:1`, then 
 - **Group:** member → `SetAVTransportURI x-rincon:<coordUUID>`; leave → `BecomeCoordinatorOfStandaloneGroup`.
 - **Queue playback:** `RemoveAllTracksFromQueue` → `AddURIToQueue(uri, meta)` → `SetAVTransportURI x-rincon-queue:<coord>#0` → (`SetPlayMode`) → `Play`.
 - **Favourites:** `Browse FV:2` → DIDL items; `res` = URI, `r:resMD` = metadata (escaped). Send both back unchanged.
+  Each item also has `upnp:albumArtURI` (a `/getaa?…` path on the player, or an https/cloudfront URL) — used for the web UI covers.
+- **Absolute group volume:** `GroupRenderingControl#SnapshotGroupVolume` then `SetGroupVolume <DesiredVolume>` (keeps the rooms' balance).
+  Relative: `SetRelativeGroupVolume <Adjustment>` → returns `NewVolume`.
 - **Next track's art:** `GetPositionInfo` `<Track>` (1-based) → `Browse Q:0` with `StartingIndex = Track`, count 1, filter `upnp:albumArtURI`.
   The queue's art URL is byte-identical to the one `GetPositionInfo` reports when that track plays (so it works as a cache key).
 

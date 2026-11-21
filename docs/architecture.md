@@ -28,7 +28,7 @@ Worker stack is 24 KB (TLS handshakes). Large JSON lives in PSRAM
 |---|---|
 | `main.cpp` | Boot order: art → display → LittleFS → presets → sonos → spotify → WiFi → WiFi event log → netwatch → mDNS → web → actions → buttons. `loop()`: buttons + `[net]` heartbeat |
 | `config.h` | Pins, timings, hostname, `DISPLAY_PANEL` flag, LCD pins |
-| `actions.{h,cpp}` | `ActionType` enum, queue, worker loop, preset/random/transport logic, now-playing render, current group + active preset (NVS), prefetch trigger |
+| `actions.{h,cpp}` | `ActionType` enum, queue, worker loop, preset/random/transport/volume logic, now-playing render, now-playing snapshot for the web (`nowPlayingJson`, change callback), current group + active preset (NVS), prefetch trigger |
 | `buttons.{h,cpp}` | Bounce2 per pin → actions. Vol± auto-repeat |
 | `sonos/soap.{h,cpp}` | Minimal SOAP client (`HTTPClient`), XML escape/unescape (UTF-8 aware), tag/attr extraction, `lastError()` |
 | `sonos/sonos.{h,cpp}` | Discovery (SSDP + topology), favourites, grouping, volume, play favourite, transport, now-playing (incl. art URL/album), `nextArtUrl()`, `spotifyAccount()`, `unsupportedReason()` |
@@ -38,7 +38,7 @@ Worker stack is 24 KB (TLS handshakes). Large JSON lives in PSRAM
 | `presets.{h,cpp}` | 4 presets in `/presets.json` (LittleFS); favourite metadata resolved via catalog |
 | `display.{h,cpp}` | 240×280 framebuffer (LovyanGFX sprite in PSRAM); views: hero now-playing, message; publishes LE RGB565 frame; optional ST7789 panel |
 | `art.{h,cpp}` | Cover download (de-chunking), 1/8 preview decode, full decode, palette, album colour cache (NVS), 18-slot LRU cover cache, prefetch |
-| `web.{h,cpp}`, `web_ui.h` | ESPAsyncWebServer routes, SSE `/events`, embedded single-page UI |
+| `web.{h,cpp}`, `web_ui.h` | ESPAsyncWebServer routes, SSE `/events` (`frame`, `np`), embedded single-page app (see web-ui.md). `/api/favourites` JSON is hand-written into one PSRAM string (D23) |
 | `wifi_setup.{h,cpp}` | WiFiManager captive portal (own TU: header clash with async server), forces STA mode after portal |
 | `netwatch.{h,cpp}` | Silent-drop watchdog (D15) |
 | `psram_json.h` | ArduinoJson allocator that uses PSRAM |
@@ -61,11 +61,12 @@ Worker stack is 24 KB (TLS handshakes). Large JSON lives in PSRAM
 | GET | `/` | UI (`web_ui.h`) |
 | GET | `/api/state` | phase, WiFi, counts, current group names, `frame` version |
 | GET | `/api/rooms` | name, uuid, coordinator |
-| GET | `/api/favourites` | catalog: title, uri, group, `unsupported` reason |
-| GET/POST | `/api/presets` | array of 4; POST body JSON |
-| POST | `/api/action?type=…&n=…` | `preset playpause stop volup voldown next random rescan sync` |
+| GET | `/api/favourites` | catalog: title, uri, group, `art`, `unsupported` reason |
+| GET | `/api/nowplaying` | ok, state, title, artist, album, art, group, badge, volume, preset (also pushed as SSE `np`) |
+| GET/POST | `/api/presets` | array of 4 (GET adds `art`, `favUnsupported`); POST body JSON |
+| POST | `/api/action?type=…&n=…` | `preset playpause stop volup voldown next random rescan sync volume` (`volume`: n = 0–100, absolute group volume) |
 | GET | `/api/screen` | raw LE RGB565 240×280 (snapshot per request) |
-| GET | `/events` | SSE `frame` events `{"v":N}` (needs `Accept: text/event-stream`) |
+| GET | `/events` | SSE `frame` `{"v":N}` and `np` (now-playing JSON); needs `Accept: text/event-stream` |
 | GET | `/api/services` | Spotify status |
 | POST | `/api/services/spotify/{client,connect,callback,disconnect}` | sign-in flow (form params) |
 

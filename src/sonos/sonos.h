@@ -19,6 +19,7 @@ struct Favourite {
   String uri;
   String meta;   // DIDL-Lite metadata (unescaped)
   String group;  // where it came from, for the UI ("Sonos Favourites", ...)
+  String art;    // cover image URL for the web UI (http on the LAN, or https), "" if none
 };
 
 // Why a favourite can't be played over local UPnP control, or "" if it can.
@@ -71,6 +72,8 @@ bool stop(const String &coordUuid);
 bool next(const String &coordUuid);
 // Relative group volume change; returns the new volume or -1.
 int adjustGroupVolume(const String &coordUuid, int delta);
+// Absolute group volume (0-100), keeping the rooms' relative balance.
+bool setGroupVolume(const String &coordUuid, int volume);
 
 NowPlaying nowPlaying(const String &coordUuid);
 // Cover URL of the track after the current one in the group's queue, or "" if

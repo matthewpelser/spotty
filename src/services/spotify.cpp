@@ -195,6 +195,14 @@ bool ensureToken() {
   return g_access.length() > 0;
 }
 
+// A mid-sized cover from Spotify's image list (largest first, often 640/300/64 px).
+String pickImage(JsonVariantConst images) {
+  JsonArrayConst arr = images.as<JsonArrayConst>();
+  if (arr.size() == 0) return String();
+  JsonVariantConst pick = arr.size() >= 2 ? arr[1] : arr[0];
+  return pick["url"] | "";
+}
+
 void addAlbums(JsonArrayConst arr, const char *albumKey, const char *group, std::vector<Item> &out) {
   for (JsonVariantConst v : arr) {
     JsonVariantConst a = albumKey ? v[albumKey] : v;
@@ -203,7 +211,7 @@ void addAlbums(JsonArrayConst arr, const char *albumKey, const char *group, std:
     String title = a["name"] | "";
     const char *artist = a["artists"][0]["name"];
     if (artist) title += String(" - ") + artist;
-    out.push_back({"album", id, title, group});
+    out.push_back({"album", id, title, group, pickImage(a["images"])});
   }
 }
 
@@ -329,6 +337,7 @@ bool refreshCatalog() {
     JsonDocument filter, doc(PsramAllocator::instance());
     filter["items"][0]["id"] = true;
     filter["items"][0]["name"] = true;
+    filter["items"][0]["images"] = true;
     filter["next"] = true;
     if (apiGet("https://api.spotify.com/v1/me/playlists?limit=50&offset=" + String(offset), doc,
                filter) != 200) {
@@ -337,7 +346,7 @@ bool refreshCatalog() {
     }
     for (JsonVariantConst p : doc["items"].as<JsonArrayConst>()) {
       const char *id = p["id"];
-      if (id) list.push_back({"playlist", id, p["name"] | "", "Spotify - Your playlists"});
+      if (id) list.push_back({"playlist", id, p["name"] | "", "Spotify - Your playlists", pickImage(p["images"])});
     }
     if (doc["next"].isNull()) break;
   }
@@ -346,6 +355,7 @@ bool refreshCatalog() {
     JsonDocument filter, doc(PsramAllocator::instance());
     filter["items"][0]["album"]["id"] = true;
     filter["items"][0]["album"]["name"] = true;
+    filter["items"][0]["album"]["images"] = true;
     filter["items"][0]["album"]["artists"][0]["name"] = true;
     if (apiGet("https://api.spotify.com/v1/me/albums?limit=50", doc, filter) == 200)
       addAlbums(doc["items"], "album", "Spotify - Saved albums", list);
@@ -355,6 +365,7 @@ bool refreshCatalog() {
     JsonDocument filter, doc(PsramAllocator::instance());
     filter["albums"]["items"][0]["id"] = true;
     filter["albums"]["items"][0]["name"] = true;
+    filter["albums"]["items"][0]["images"] = true;
     filter["albums"]["items"][0]["artists"][0]["name"] = true;
     if (apiGet("https://api.spotify.com/v1/browse/new-releases?limit=30", doc, filter) == 200)
       addAlbums(doc["albums"]["items"], nullptr, "Spotify - New releases", list);

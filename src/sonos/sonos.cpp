@@ -191,6 +191,8 @@ bool loadFavourites() {
     f.title = soap::unescape(soap::tag(item, "dc:title"));
     f.uri = soap::unescape(soap::tag(item, "res"));
     f.meta = soap::unescape(soap::tag(item, "r:resMD"));
+    f.art = soap::unescape(soap::tag(item, "upnp:albumArtURI"));
+    if (f.art.startsWith("/")) f.art = "http://" + g_lastIp + ":1400" + f.art;
     f.group = "Sonos Favourites";
     if (f.title.length() && f.uri.length()) list.push_back(f);
   }
@@ -365,6 +367,15 @@ bool stop(const String &coordUuid) {
 bool next(const String &coordUuid) {
   Room c;
   return findRoom(coordUuid, c) && avt(c, "Next");
+}
+
+bool setGroupVolume(const String &coordUuid, int volume) {
+  Room c;
+  if (!findRoom(coordUuid, c)) return false;
+  soap::call(c.ip, soap::GroupRenderingControl, "SnapshotGroupVolume", INSTANCE);
+  return soap::call(c.ip, soap::GroupRenderingControl, "SetGroupVolume",
+                    String(INSTANCE) + "<DesiredVolume>" + constrain(volume, 0, 100) +
+                        "</DesiredVolume>");
 }
 
 int adjustGroupVolume(const String &coordUuid, int delta) {

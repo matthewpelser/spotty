@@ -55,7 +55,8 @@ Refresh tokens rotate and are saved. TLS uses pinned root CAs (no `setInsecure`)
 **D12. Lists fetched:** `/me/playlists` (≤200), `/me/albums` (50), `/browse/new-releases` (returns 403 for new dev apps → silently skipped).
 Spotify editorial/algorithmic lists appear only if the user follows them.
 
-**D13. Sonos Favourites and Spotify items share one dropdown, grouped by source** ("Sonos Favourites", "Spotify - Your playlists", "Spotify - Saved albums").
+**D13. Sonos Favourites and Spotify items share one list, grouped by source** ("Sonos Favourites", "Spotify - Your playlists", "Spotify - Saved albums").
+Originally a `<select>`; since D22 a searchable picker sheet with covers and All / Favourites / Playlists / Albums filters.
 
 ## Robustness
 
@@ -86,3 +87,19 @@ Vol± updates the bar in place (no separate volume screen). Details in display-d
 Rejected: 2 (plain gradient preview — kept only as the "pending" state), 7 cross-fade.
 
 **D21. Messages (grouping, errors) reuse the current art palette as background.**
+
+## Web app
+
+**D22. Web UI redesigned as "Preset tiles" (option B of three).** iOS-style, light/dark from the phone, mobile first.
+Rejected: A "Now Playing" (dark, big art) and C "Inset grouped". Shared screens: editor sheet, searchable music picker,
+Controller page. The live LCD simulation (true size, crisp, same bezel as the original page) is shown on the Home screen above the presets and on the Controller page.
+The page now renders real text/covers from `/api/nowplaying` instead of a picture of the LCD. Details: web-ui.md.
+
+**D23. `/api/favourites` is written as JSON text by hand, not via a JsonDocument.**
+With cover URLs added, building the 246-item list in a JsonDocument using `PsramAllocator` produced a deterministic
+corrupted/truncated result (39 items, one with a mangled URI). Writing the JSON straight into one PSRAM `String`
+fixed it and uses less memory. `PsramAllocator` is still used for Spotify page parsing, where results check out —
+treat it as suspect (see backlog).
+
+**D24. Absolute volume** for the slider: `SnapshotGroupVolume` + `SetGroupVolume` (keeps the rooms' balance),
+new `volume` action; queued volume actions are coalesced to the latest.

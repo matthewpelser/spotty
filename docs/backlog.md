@@ -9,6 +9,8 @@
 - **Spotify album playback** from the Spotify lists (playlists verified via New Music Friday; albums use the same format as the "I Love Bread" favourite).
 - **WiFi setup portal path** after the AP-off fix (only one first-time setup has happened).
 
+- **Web app on a real iPhone** (tested only in headless Chrome with iPhone emulation): Add to Home Screen, safe areas, slider drag feel, sheet scrolling.
+
 ## Known limitations
 
 - TuneIn and Sonos Radio favourites can't be started locally (D9).
@@ -17,6 +19,10 @@
 - Fonts are ASCII only (accents transliterated, other scripts become "?").
 - Title is one line with ellipsis.
 - `ssl_client … (-76)` log lines when Spotify closes connections are harmless noise.
+
+- `PsramAllocator` (ArduinoJson → PSRAM) produced a corrupted large document (D23). Spotify parsing still uses it; investigate or replace.
+- No Add-to-Home-Screen icon yet (needs a PNG `apple-touch-icon`).
+- Rooms can be ticked in any order, but the editor only shows the leader, not the full order.
 
 ## Ideas / not chosen yet
 
@@ -30,4 +36,5 @@
 ## Housekeeping
 
 - First proof of concept committed as `ad92f8e` (branch `poc`), fast-forward merged into `main` and pushed on 2026-11-21.
+- The web app redesign (D22–D24: Preset tiles UI, now-playing API, cover art, absolute volume, favourites JSON fix, home-screen LCD) committed to `main` and pushed on 2026-11-21 ("Redesign web app as iOS-style \"Preset tiles\"").
 - Diagnostic logging kept on purpose: `[net]` heartbeat, `[netwatch]`, `[art]`, `[screen]`, `[soap]`, WiFi events.

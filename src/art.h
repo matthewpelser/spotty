@@ -39,7 +39,7 @@ Palette defaultPalette();
 void select(const String &url, const String &albumKey);
 // Do the next loading stage for the current cover. True if the stage changed.
 bool step();
-// Download and fully decode `url` into the spare slot (blocking, ~0.75 s).
+// Download and fully decode `url` into a free (or least recently used) cache slot (blocking, ~0.75-1.6 s).
 void prefetch(const String &url);
 
 Stage stage();

@@ -13,6 +13,7 @@ Favourite fromSpotify(const spotify::Item &it, bool linked, const String &sn, co
                       bool withMeta) {
   Favourite f;
   f.title = it.title;
+  f.art = it.image;
   f.group = it.group;
   if (!linked) {  // can't play without Sonos's Spotify account details
     f.uri = "spotify:" + it.kind + ":" + it.id;

@@ -25,7 +25,7 @@ struct Action {
   uint8_t index;
 };
 
-const char *NAMES[] = {"preset", "playpause", "stop", "volup", "voldown", "next", "random", "rescan", "sync"};
+const char *NAMES[] = {"preset", "playpause", "stop", "volup", "voldown", "next", "random", "rescan", "sync", "volume"};
 
 QueueHandle_t g_queue;
 SemaphoreHandle_t g_mtx;
@@ -47,6 +47,37 @@ void setActivePreset(int v) {
   p.begin("spotty", false);
   p.putInt("active", v);
   p.end();
+}
+
+// Now-playing snapshot shared with the web server.
+struct NowState {
+  bool ok = false;
+  String state, title, artist, album, art, group, badge;
+  int volume = -1;
+  int preset = -1;
+  bool operator==(const NowState &o) const {
+    return ok == o.ok && state == o.state && title == o.title && artist == o.artist &&
+           album == o.album && art == o.art && group == o.group && badge == o.badge &&
+           volume == o.volume && preset == o.preset;
+  }
+};
+NowState g_now;
+std::function<void()> g_onNow;
+
+void publishNow(const NowState &n) {
+  xSemaphoreTake(g_mtx, portMAX_DELAY);
+  bool changed = !(n == g_now);
+  if (changed) g_now = n;
+  xSemaphoreGive(g_mtx);
+  if (changed && g_onNow) g_onNow();
+}
+
+void publishVolume(int vol) {
+  xSemaphoreTake(g_mtx, portMAX_DELAY);
+  NowState n = g_now;
+  xSemaphoreGive(g_mtx);
+  n.volume = vol;
+  publishNow(n);
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -141,6 +172,20 @@ void renderNowPlaying() {
   v.artUrl = np.artUrl;
   v.albumKey = np.album.length() ? np.artist + "|" + np.album : String();
   v.badge = presetBadge();
+
+  NowState n;
+  n.ok = true;
+  n.state = np.state;
+  n.title = np.title;
+  n.artist = np.artist;
+  n.album = np.album;
+  n.art = np.artUrl;
+  n.group = v.group;
+  n.badge = v.badge;
+  n.volume = np.volume;
+  n.preset = g_activePreset == RANDOM_BADGE ? -1 : g_activePreset;
+  publishNow(n);
+
   display::nowPlaying(v);
 
   // Once per track: load the next queue track's cover in the background so the
@@ -284,6 +329,23 @@ void handle(Action a) {
       if (vol >= 0) {
         g_msgUntil = millis() + 1500;
         display::volume(vol);
+        publishVolume(vol);
+      }
+      break;
+    }
+    case ActionType::Volume: {
+      // A dragged slider sends many; only the latest matters.
+      int vol = a.index;
+      Action more;
+      while (xQueuePeek(g_queue, &more, 0) == pdTRUE && more.type == ActionType::Volume) {
+        xQueueReceive(g_queue, &more, 0);
+        vol = more.index;
+      }
+      vol = constrain(vol, 0, 100);
+      if (sonos::setGroupVolume(coord, vol)) {
+        g_msgUntil = millis() + 1500;
+        display::volume(vol);
+        publishVolume(vol);
       }
       break;
     }
@@ -372,5 +434,23 @@ std::vector<String> currentGroup() {
 }
 
 uint32_t lastActivity() { return g_lastActivity; }
+
+void nowPlayingJson(JsonObject o) {
+  xSemaphoreTake(g_mtx, portMAX_DELAY);
+  NowState n = g_now;
+  xSemaphoreGive(g_mtx);
+  o["ok"] = n.ok;
+  o["state"] = n.state;
+  o["title"] = n.title;
+  o["artist"] = n.artist;
+  o["album"] = n.album;
+  o["art"] = n.art;
+  o["group"] = n.group;
+  o["badge"] = n.badge;
+  o["volume"] = n.volume;
+  o["preset"] = n.preset;
+}
+
+void onNowPlayingChange(std::function<void()> cb) { g_onNow = cb; }
 
 }  // namespace actions
